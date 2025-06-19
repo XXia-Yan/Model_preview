@@ -2,26 +2,55 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3D 模型展示</title>
+  <title>模型查看与交互采集</title>
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
   <style>
-    body { margin: 0; font-family: sans-serif; background: #fff; }
+    body { margin: 0; }
     model-viewer { width: 100vw; height: 100vh; }
-    #info { position: absolute; top: 20px; left: 20px; background: rgba(255,255,255,0.8); padding: 10px; border-radius: 8px; }
   </style>
 </head>
 <body>
-  <div id="info">
-    <h3>模型名称</h3>
-    <p>这是模型的简要介绍。</p>
-  </div>
-  <model-viewer 
-    src="model001.glb" 
-    alt="3D模型"
+  <model-viewer id="viewer"
+    src="models/model001.glb"
     auto-rotate
     camera-controls
-    shadow-intensity="1"
-    ar>
+    shadow-intensity="1">
   </model-viewer>
+
+  <script>
+    const viewer = document.getElementById('viewer');
+    const endpoint = "http://180.76.171.253:6000/log"; // 👈 你的公网穿透地址
+
+    const sendEvent = (type, data) => {
+      fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type,
+          timestamp: Date.now(),
+          model: viewer.getAttribute("src"),
+          ...data
+        })
+      }).catch(err => console.error("上报失败:", err));
+    };
+
+    // 监听相机变化（旋转、缩放）
+    viewer.addEventListener("camera-change", () => {
+      const cam = viewer.getCameraOrbit();
+      sendEvent("camera-change", {
+        theta: cam.theta,
+        phi: cam.phi,
+        radius: cam.radius,
+        fov: viewer.getFieldOfView()
+      });
+    });
+
+    // 页面卸载前发送停留时间
+    const startTime = Date.now();
+    window.addEventListener("beforeunload", () => {
+      const duration = Date.now() - startTime;
+      sendEvent("page-leave", { duration });
+    });
+  </script>
 </body>
 </html>
